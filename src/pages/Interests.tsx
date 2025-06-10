@@ -123,7 +123,7 @@ const Interests = () => {
             email: user.email,
             password: "", // We don't store passwords in our table, Supabase Auth handles this
             interests: selectedInterests,
-            avatarUrl: "https://randomuser.me/api/portraits/men/36.jpg",
+            avatarurl: "https://randomuser.me/api/portraits/men/36.jpg",
             xp: 0,
             level: 1,
             badges: [],
@@ -134,7 +134,7 @@ const Interests = () => {
 
       toast({
         title: "Interests saved!",
-        description: "Welcome to Tidlr! Let's start learning.",
+        description: "Welcome to Tidlrs! Let's start learning.",
       });
 
       navigate("/dashboard");

@@ -15,7 +15,7 @@ export type Database = {
           badges: string[] | null
           created_at: string
           email: string
-          id: number
+          id: string
           interests: string[]
           level: number | null
           name: string
@@ -27,7 +27,7 @@ export type Database = {
           badges?: string[] | null
           created_at?: string
           email: string
-          id?: number
+          id?: string
           interests: string[]
           level?: number | null
           name: string
@@ -39,7 +39,7 @@ export type Database = {
           badges?: string[] | null
           created_at?: string
           email?: string
-          id?: number
+          id?: string
           interests?: string[]
           level?: number | null
           name?: string

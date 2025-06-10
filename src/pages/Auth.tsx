@@ -110,7 +110,7 @@ const Auth = () => {
           <p className="text-muted-foreground">
             {isLogin
               ? "Sign in to continue your learning journey"
-              : "Join Tidlr and start learning"}
+              : "Join Tidlrs and start learning"}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">

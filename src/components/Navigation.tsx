@@ -40,7 +40,7 @@ const Navigation = () => {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <Link to="/" className="text-2xl font-bold text-primary">
-              Tidlr
+              Tidlrs
             </Link>
           </div>
           
