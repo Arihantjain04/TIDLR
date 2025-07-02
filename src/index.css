@@ -5,6 +5,12 @@
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
 
+.ProseMirror:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+
 @layer base {
   :root {
     --background: 0 0% 100%;

@@ -20,15 +20,44 @@ const Auth = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if user is already logged in
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate("/dashboard");
+    const checkAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) throw error;
+
+        if (session) {
+          const { data: { user }, error: userError } = 
+            await supabase.auth.getUser(session.access_token);
+          
+          if (userError) throw userError;
+          
+          const now = Math.floor(Date.now() / 1000);
+          if (session.expires_at && now > session.expires_at) {
+            await supabase.auth.refreshSession();
+          }
+          
+          navigate("/dashboard");
+        }
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        await supabase.auth.signOut();
+        navigate("/login");
       }
     };
-    checkUser();
+    checkAuth();
   }, [navigate]);
+
+  // useEffect(() => {
+  //   // Check if user is already logged in
+  //   const checkUser = async () => {
+  //     const { data: { session } } = await supabase.auth.getSession();
+  //     if (session) {
+  //       navigate("/dashboard");
+  //     }
+  //   };
+  //   checkUser();
+  // }, [navigate]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();

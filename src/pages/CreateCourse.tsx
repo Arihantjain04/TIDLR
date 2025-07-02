@@ -1,13 +1,22 @@
-
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Link as LinkIcon, Youtube, FileText, X, GripVertical } from "lucide-react";
+import {
+  Plus,
+  Link as LinkIcon,
+  Youtube,
+  FileText,
+  X,
+  GripVertical,
+  Loader2,
+} from "lucide-react";
 import Navigation from "@/components/Navigation";
+import { supabase } from "@/integrations/supabase/client";
 
 const CreateCourse = () => {
   const [courseTitle, setCourseTitle] = useState("");
@@ -15,22 +24,10 @@ const CreateCourse = () => {
   const [newResourceUrl, setNewResourceUrl] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
-  const [resources, setResources] = useState([
-    {
-      id: 1,
-      type: "youtube",
-      title: "React Hooks Tutorial",
-      url: "https://youtube.com/watch?v=example",
-      description: "Learn the basics of React Hooks",
-    },
-    {
-      id: 2,
-      type: "article",
-      title: "Advanced React Patterns",
-      url: "https://example.com/article",
-      description: "Deep dive into React patterns",
-    },
-  ]);
+  const [resources, setResources] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const navigate = useNavigate();
 
   const getResourceIcon = (type: string) => {
     switch (type) {
@@ -58,7 +55,7 @@ const CreateCourse = () => {
   };
 
   const removeResource = (id: number) => {
-    setResources(resources.filter(resource => resource.id !== id));
+    setResources(resources.filter((resource) => resource.id !== id));
   };
 
   const addTag = () => {
@@ -69,15 +66,61 @@ const CreateCourse = () => {
   };
 
   const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
+    setTags(tags.filter((tag) => tag !== tagToRemove));
+  };
+
+  const handlePublish = async () => {
+    setLoading(true);
+    try {
+      const userSession = await supabase.auth.getSession();
+      const token = userSession.data.session?.access_token;
+
+      const payload = {
+        title: courseTitle,
+        description: courseDescription,
+        tags,
+        resources: resources.map((res, index) => ({
+          url: res.url,
+          typeOfResc: res.type,
+          title: res.title,
+          description: res.description,
+          order: index + 1,
+        })),
+      };
+
+      const response = await fetch(
+        `${'https://tidlr-backend.onrender.com'}/v1/course/create-course`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Failed to create course");
+
+      navigate(`/course/${data.course._id}`, {
+        state: {
+          course: data.course,
+        },
+      });
+    } catch (error) {
+      console.error("Publish error:", error);
+      alert("Failed to publish course");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground">Create Course</h1>
           <p className="text-muted-foreground mt-2">
@@ -101,7 +144,7 @@ const CreateCourse = () => {
                   onChange={(e) => setCourseTitle(e.target.value)}
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="description">Description</Label>
                 <Textarea
@@ -113,12 +156,15 @@ const CreateCourse = () => {
                 />
               </div>
 
-              {/* Tags */}
               <div>
                 <Label>Tags</Label>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="flex items-center gap-1">
+                    <Badge
+                      key={tag}
+                      variant="secondary"
+                      className="flex items-center gap-1"
+                    >
                       {tag}
                       <X
                         className="h-3 w-3 cursor-pointer"
@@ -132,7 +178,7 @@ const CreateCourse = () => {
                     placeholder="Add a tag..."
                     value={newTag}
                     onChange={(e) => setNewTag(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && addTag()}
+                    onKeyDown={(e) => e.key === "Enter" && addTag()}
                   />
                   <Button onClick={addTag} variant="outline" size="sm">
                     Add
@@ -153,7 +199,7 @@ const CreateCourse = () => {
                   placeholder="Paste YouTube link, article URL, or any resource..."
                   value={newResourceUrl}
                   onChange={(e) => setNewResourceUrl(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && addResource()}
+                  onKeyDown={(e) => e.key === "Enter" && addResource()}
                 />
                 <Button onClick={addResource}>
                   <Plus className="h-4 w-4 mr-2" />
@@ -181,8 +227,12 @@ const CreateCourse = () => {
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <Icon className="h-5 w-5 text-primary flex-shrink-0" />
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium text-sm truncate">{resource.title}</p>
-                          <p className="text-xs text-muted-foreground truncate">{resource.url}</p>
+                          <p className="font-medium text-sm truncate">
+                            {resource.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {resource.url}
+                          </p>
                         </div>
                       </div>
                       <span className="text-xs text-muted-foreground px-2 py-1 bg-secondary rounded">
@@ -198,12 +248,14 @@ const CreateCourse = () => {
                     </div>
                   );
                 })}
-                
+
                 {resources.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     <LinkIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p>No resources added yet</p>
-                    <p className="text-sm">Start by adding your first learning resource above</p>
+                    <p className="text-sm">
+                      Start by adding your first learning resource above
+                    </p>
                   </div>
                 )}
               </div>
@@ -215,7 +267,10 @@ const CreateCourse = () => {
             <Button variant="outline">Save as Draft</Button>
             <div className="flex gap-3">
               <Button variant="outline">Preview Course</Button>
-              <Button>Publish Course</Button>
+              <Button onClick={handlePublish} disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {loading ? "Publishing..." : "Publish Course"}
+              </Button>
             </div>
           </div>
         </div>
