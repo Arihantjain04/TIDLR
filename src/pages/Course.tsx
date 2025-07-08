@@ -26,6 +26,8 @@ import {
 import { Link, useParams, useLocation } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import axios from "axios";
+import { serverurl } from "../../urls.json";
+import { log } from "console";
 
 declare global {
   interface Window {
@@ -65,8 +67,6 @@ const Course = () => {
   const { id: courseId } = useParams();
   const { course } = useLocation().state;
   const [currentResource, setCurrentResource] = useState(0);
-  const [notesVisible, setNotesVisible] = useState(false);
-  const [notes, setNotes] = useState<Record<string, string>>({});
   const [pendingCompletions, setPendingCompletions] = useState<
     Record<string, boolean>
   >({});
@@ -89,7 +89,7 @@ const Course = () => {
   useEffect(() => {
     const fetchResources = async () => {
       try {
-        console.log(course);
+        // console.log(course);
 
         setLoading(true);
         const token = getSupabaseToken();
@@ -99,14 +99,14 @@ const Course = () => {
         }
 
         const response = await axios.get<{ resources: Resource[] }>(
-          `${'https://tidlr-backend.onrender.com'}/v1/course/get-all-resc/${courseId}`,
+          `${serverurl}/v1/course/get-all-resc/${courseId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
             },
           }
         );
-        console.log("Fetched resources:", response.data.resources);
+        // console.log("Fetched resources:", response.data.resources);
 
         setResources(response.data.resources);
 
@@ -195,7 +195,7 @@ const Course = () => {
       }
 
       await axios.post(
-        `${'https://tidlr-backend.onrender.com'}/v1/course/update-resc-complete-status/${courseId}`,
+        `${serverurl}/v1/course/update-resc-complete-status/${courseId}`,
         { completions: pendingCompletions },
         {
           headers: {
@@ -239,27 +239,75 @@ const Course = () => {
 
   const currentId = currentResourceData._id;
 
+  const [notesVisible, setNotesVisible] = useState(false);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  
   const editor = useEditor({
     extensions: [StarterKit, Underline],
-    content: notes[currentId] || "",
-    onUpdate: ({ editor }) => {
-      setNotes((prev) => ({ ...prev, [currentId]: editor.getHTML() }));
-    },
+    content: "", 
     editable: notesVisible,
+    onUpdate: ({ editor }) => {
+      if (!currentId) return;
+      const html = editor.getHTML();
+      setNotes((prev) => ({ ...prev, [currentId]: html }));
+    },
   });
-
+  
   useEffect(() => {
-    if (editor) {
-      editor.setEditable(notesVisible);
-    }
+    const fetchNotes = async () => {
+      if (!currentId || !editor) return;
+  
+      const token = getSupabaseToken();
+      if (!token) return;
+  
+      try {
+        const res = await axios.get(
+          `${serverurl}/v1/notes/get-notes-by-resc/${currentId}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+  
+        const html = res.data?.content || "<p></p>";
+  
+        setNotes((prev) => ({ ...prev, [currentId]: html }));
+        editor.commands.setContent(html);
+
+        // console.log("Fetched notes for resource:", currentId, res);
+        
+      } catch (err) {
+        console.error("Failed to fetch notes:", err);
+      }
+    };
+  
+    fetchNotes();
+  }, [currentId, editor]);
+  
+  useEffect(() => {
+    if (editor) editor.setEditable(notesVisible);
   }, [notesVisible, editor]);
-
+  
   const onSaveNotes = async () => {
-    if (!editor) return;
+    if (!editor || !currentId) return;
+  
     const html = editor.getHTML();
-    console.log("Saving notes:", html);
+    const plainText = editor.getText();
+  
+    setNotes((prev) => ({ ...prev, [currentId]: html }));
+  
+    const token = getSupabaseToken();
+    if (!token) return;
+  
+    try {
+      await axios.post(
+        `${serverurl}/v1/notes/save-notes-for-resc/${currentId}`,
+        { content: html, plainText },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // console.log("Notes saved successfully");
+    } catch (err) {
+      console.error("Failed to save notes:", err);
+    }
   };
-
+  
   useEffect(() => {
     const tag = document.createElement("script");
     tag.src = "https://www.youtube.com/iframe_api";

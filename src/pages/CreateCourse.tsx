@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import { supabase } from "@/integrations/supabase/client";
+import { serverurl } from "../../urls.json";
 
 const CreateCourse = () => {
   const [courseTitle, setCourseTitle] = useState("");
@@ -26,6 +27,7 @@ const CreateCourse = () => {
   const [newTag, setNewTag] = useState("");
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [playlistLoading, setPlaylistLoading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -40,8 +42,46 @@ const CreateCourse = () => {
     }
   };
 
-  const addResource = () => {
-    if (newResourceUrl.trim()) {
+  const addResource = async () => {
+    if (!newResourceUrl.trim()) return;
+
+    const isPlaylist = newResourceUrl.includes("list=");
+
+    if (isPlaylist) {
+      setPlaylistLoading(true);
+      try {
+        const userSession = await supabase.auth.getSession();
+        const token = userSession.data.session?.access_token;
+
+        const response = await fetch(`${serverurl}/v1/course/expand-playlist`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ url: newResourceUrl }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Failed to expand playlist");
+
+        const newResources = data.videos.map((vid: any, i: number) => ({
+          id: resources.length + i + 1,
+          type: "youtube",
+          url: vid.url,
+          title: vid.title,
+          description: vid.description || "Click to edit description",
+        }));
+
+        setResources([...resources, ...newResources]);
+        setNewResourceUrl("");
+      } catch (err) {
+        console.error(err);
+        alert("Failed to add playlist");
+      } finally {
+        setPlaylistLoading(false);
+      }
+    } else {
       const newResource = {
         id: resources.length + 1,
         type: newResourceUrl.includes("youtube") ? "youtube" : "article",
@@ -88,26 +128,20 @@ const CreateCourse = () => {
         })),
       };
 
-      const response = await fetch(
-        `${'https://tidlr-backend.onrender.com'}/v1/course/create-course`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const response = await fetch(`${serverurl}/v1/course/create-course`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
       const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error || "Failed to create course");
+      if (!response.ok) throw new Error(data.error || "Failed to create course");
 
       navigate(`/course/${data.course._id}`, {
-        state: {
-          course: data.course,
-        },
+        state: { course: data.course },
       });
     } catch (error) {
       console.error("Publish error:", error);
@@ -194,16 +228,25 @@ const CreateCourse = () => {
               <CardTitle>Add Resources</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
                 <Input
-                  placeholder="Paste YouTube link, article URL, or any resource..."
+                  placeholder="Paste YouTube link, playlist, article URL, etc."
                   value={newResourceUrl}
                   onChange={(e) => setNewResourceUrl(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addResource()}
                 />
-                <Button onClick={addResource}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add
+                <Button onClick={addResource} disabled={playlistLoading}>
+                  {playlistLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Adding playlist...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>

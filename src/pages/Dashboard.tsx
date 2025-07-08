@@ -7,6 +7,7 @@ import Navigation from "@/components/Navigation";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import {serverurl} from "../../urls.json"; 
 
 interface Course {
   _id: string;
@@ -74,7 +75,7 @@ const Dashboard = () => {
         const limit = showAll ? 0 : 3;
 
         const response = await axios.get<Course[]>(
-          `${'https://tidlr-backend.onrender.com'}/v1/course/get-all-user-courses?limit=${limit}`,
+          `${serverurl}/v1/course/get-all-user-courses?limit=${limit}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
