@@ -1,4 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -62,11 +77,47 @@ interface CourseDetails {
   completedItems: number;
   totalItems: number;
 }
+const SortableItem = ({ resource, index, isActive, isCompleted, onClick }) => {
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id: resource._id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    cursor: "grab",
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`p-3 border-b cursor-pointer flex justify-between items-center ${isActive ? "bg-accent" : "hover:bg-muted"
+        }`}
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-2">
+        {isCompleted ? (
+          <CheckCircle className="h-4 w-4 text-green-500" />
+        ) : (
+          <Circle className="h-4 w-4 text-muted-foreground" />
+        )}
+        <span className="truncate max-w-xs text-sm">
+          {resource.title || "Untitled"}
+        </span>
+      </div>
+      <div className="text-xs text-muted-foreground">{index + 1}</div>
+    </div>
+  );
+};
+
 
 const Course = () => {
   const { id: courseId } = useParams();
   const { course } = useLocation().state;
   const [currentResource, setCurrentResource] = useState(0);
+  const sensors = useSensors(useSensor(PointerSensor));
   const [pendingCompletions, setPendingCompletions] = useState<
     Record<string, boolean>
   >({});
@@ -686,55 +737,45 @@ const Course = () => {
                 <CardHeader>
                   <CardTitle>Course Outline</CardTitle>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="space-y-1">
-                    {resources.map((resource, index) => {
-                      const Icon = getResourceIcon(resource.url);
-                      const isActive = index === currentResource;
-                      const isCompleted = completedResources[resource._id];
-                      return (
-                        <button
-                          key={resource._id}
-                          onClick={() => setCurrentResource(index)}
-                          className={`w-full text-left p-4 hover:bg-accent transition-colors border-l-2 ${
-                            isActive
-                              ? "border-primary bg-accent/50"
-                              : isCompleted
-                              ? "border-green-500"
-                              : "border-transparent"
-                          }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 mt-0.5">
-                              {isCompleted ? (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
-                              ) : (
-                                <Circle className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Youtube className="h-4 w-4 text-primary flex-shrink-0" />
-                                <span className="text-sm font-medium truncate">
-                                  {resource.metaData?.title || resource.title
-                                    ? truncateText(
-                                        resource.metaData?.title ||
-                                          resource.title,
-                                        6
-                                      )
-                                    : "Untitled Resource"}
-                                </span>
-                              </div>
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              {index + 1}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </CardContent>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={({ active, over }) => {
+                    if (active.id !== over?.id) {
+                      const oldIndex = resources.findIndex(r => r._id === active.id);
+                      const newIndex = resources.findIndex(r => r._id === over?.id);
+
+                      const newOrder = arrayMove(resources, oldIndex, newIndex);
+                      setResources(newOrder);
+
+                      // Backend save
+                      const orderedIds = newOrder.map(r => r._id);
+                      const token = getSupabaseToken();
+                      axios.post(`${serverurl}/v1/course/update-resource-order/${courseId}`, {
+                        orderedResourceIds: orderedIds,
+                      }, {
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                    }
+                  }}
+                >
+                  <SortableContext
+                    items={resources.map(r => r._id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {resources.map((resource, index) => (
+                      <SortableItem
+                        key={resource._id}
+                        resource={resource}
+                        index={index}
+                        isActive={index === currentResource}
+                        isCompleted={completedResources[resource._id]}
+                        onClick={() => setCurrentResource(index)}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+
               </Card>
             </div>
           </div>

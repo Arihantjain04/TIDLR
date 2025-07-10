@@ -1,5 +1,20 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +45,7 @@ const CreateCourse = () => {
   const [playlistLoading, setPlaylistLoading] = useState(false);
 
   const navigate = useNavigate();
+  const sensors = useSensors(useSensor(PointerSensor));
 
   const getResourceIcon = (type: string) => {
     switch (type) {
@@ -40,6 +56,48 @@ const CreateCourse = () => {
       default:
         return LinkIcon;
     }
+  };
+
+  const SortableItem = ({ resource }: { resource: any }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+    } = useSortable({ id: resource.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    };
+
+    const Icon = getResourceIcon(resource.type);
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        {...attributes}
+        {...listeners}
+        className="flex items-center gap-3 p-4 border border-border rounded-lg bg-card hover:bg-accent/50 transition-colors"
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Icon className="h-5 w-5 text-primary flex-shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-sm truncate">{resource.title}</p>
+            <p className="text-xs text-muted-foreground truncate">{resource.url}</p>
+          </div>
+        </div>
+        <span className="text-xs text-muted-foreground px-2 py-1 bg-secondary rounded">
+          {resources.findIndex((r) => r.id === resource.id) + 1}
+        </span>
+        <Button size="sm" variant="ghost" onClick={() => removeResource(resource.id)}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    );
   };
 
   const addResource = async () => {
@@ -258,50 +316,25 @@ const CreateCourse = () => {
               <CardTitle>Course Content ({resources.length} items)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {resources.map((resource, index) => {
-                  const Icon = getResourceIcon(resource.type);
-                  return (
-                    <div
-                      key={resource.id}
-                      className="flex items-center gap-3 p-4 border border-border rounded-lg bg-card hover:bg-accent/50 transition-colors"
-                    >
-                      <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <Icon className="h-5 w-5 text-primary flex-shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-sm truncate">
-                            {resource.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {resource.url}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-xs text-muted-foreground px-2 py-1 bg-secondary rounded">
-                        {index + 1}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => removeResource(resource.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  );
-                })}
-
-                {resources.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <LinkIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No resources added yet</p>
-                    <p className="text-sm">
-                      Start by adding your first learning resource above
-                    </p>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={({ active, over }) => {
+                  if (active.id !== over?.id) {
+                    const oldIndex = resources.findIndex((r) => r.id === active.id);
+                    const newIndex = resources.findIndex((r) => r.id === over?.id);
+                    setResources((items) => arrayMove(items, oldIndex, newIndex));
+                  }
+                }}
+              >
+                <SortableContext items={resources.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-3">
+                    {resources.map((resource) => (
+                      <SortableItem key={resource.id} resource={resource} />
+                    ))}
                   </div>
-                )}
-              </div>
+                </SortableContext>
+              </DndContext>
             </CardContent>
           </Card>
 
