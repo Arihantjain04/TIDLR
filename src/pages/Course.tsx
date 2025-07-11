@@ -20,6 +20,7 @@ import {
   Link as LinkIcon,
   ArrowLeft,
   ArrowRight,
+  Pencil,
   Share,
   Bookmark,
 } from "lucide-react";
@@ -75,6 +76,9 @@ const Course = () => {
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // console.log("Course ID from params:", course);
+  
 
   const courseDetails: CourseDetails = {
     id: course.id,
@@ -461,14 +465,24 @@ const Course = () => {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 mb-4">
-                {courseDetails.tags.map((tag) => (
+              {/* {courseDetails ? courseDetails.tags.map((tag) => (
                   <Badge key={tag} variant="secondary">
                     {tag}
                   </Badge>
-                ))}
+                )): <></>} */}
               </div>
             </div>
             <div className="flex gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link
+                  to={`/edit-course/${courseDetails.id}`}
+                  state={{ course: courseDetails }}
+                  className="flex items-center gap-1"
+                >
+                  <Pencil className="w-4 h-4" />
+                  Edit Course
+                </Link>
+              </Button>
               <Button variant="outline" size="sm">
                 <Bookmark className="h-4 w-4 mr-2" />
                 Save
@@ -696,13 +710,12 @@ const Course = () => {
                         <button
                           key={resource._id}
                           onClick={() => setCurrentResource(index)}
-                          className={`w-full text-left p-4 hover:bg-accent transition-colors border-l-2 ${
-                            isActive
+                          className={`w-full text-left p-4 hover:bg-accent transition-colors border-l-2 ${isActive
                               ? "border-primary bg-accent/50"
                               : isCompleted
-                              ? "border-green-500"
-                              : "border-transparent"
-                          }`}
+                                ? "border-green-500"
+                                : "border-transparent"
+                            }`}
                         >
                           <div className="flex items-start gap-3">
                             <div className="flex-shrink-0 mt-0.5">
@@ -718,10 +731,10 @@ const Course = () => {
                                 <span className="text-sm font-medium truncate">
                                   {resource.metaData?.title || resource.title
                                     ? truncateText(
-                                        resource.metaData?.title ||
-                                          resource.title,
-                                        6
-                                      )
+                                      resource.metaData?.title ||
+                                      resource.title,
+                                      6
+                                    )
                                     : "Untitled Resource"}
                                 </span>
                               </div>

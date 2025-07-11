@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   DndContext,
   closestCenter,
@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+
 import {
   Plus,
   Link as LinkIcon,
@@ -34,18 +35,64 @@ import Navigation from "@/components/Navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { serverurl } from "../../urls.json";
 
-const CreateCourse = () => {
-  const [courseTitle, setCourseTitle] = useState("");
-  const [courseDescription, setCourseDescription] = useState("");
-  const [newResourceUrl, setNewResourceUrl] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
-  const [newTag, setNewTag] = useState("");
+const EditCourse = () => {
+  const { id: courseId } = useParams();
+  const { state } = useLocation();
+  const navigate = useNavigate();
+
+  const [courseDetails, setCourseDetails] = useState({
+    id: "",
+    title: "",
+    description: "No description available",
+    tags: [] as string[],
+    progress: 0,
+    completedItems: 0,
+    totalItems: 0,
+  });
+
   const [resources, setResources] = useState([]);
+  const [newTag, setNewTag] = useState("");
+  const [newResourceUrl, setNewResourceUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [playlistLoading, setPlaylistLoading] = useState(false);
 
-  const navigate = useNavigate();
   const sensors = useSensors(useSensor(PointerSensor));
+
+  useEffect(() => {
+    if (!state?.course) return;
+    const course = state.course;
+
+    setCourseDetails({
+      id: course.id,
+      title: course.title,
+      description: course.description || "No description available",
+      tags: course.tags || [],
+      progress: course.progress || 0,
+      completedItems: course.completedResc || 0,
+      totalItems: course.numberOfResc || 0,
+    });
+
+    fetch(`${serverurl}/v1/course/get-all-resc/${courseId}`, {
+      headers: {
+        Authorization: `Bearer ${
+          JSON.parse(
+            localStorage.getItem("sb-xxqoscilojosafuiwpxk-auth-token") || "{}"
+          ).access_token
+        }`,
+      },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const enriched = data.resources.map((r, i) => ({
+          id: r._id,
+          title: r.title,
+          description: r.description || "Click to edit description",
+          url: r.url,
+          type: r.url.includes("youtube") ? "youtube" : "article",
+        }));
+        setResources(enriched);
+      });
+  }, [courseId, state]);
 
   const getResourceIcon = (type: string) => {
     switch (type) {
@@ -59,13 +106,8 @@ const CreateCourse = () => {
   };
 
   const SortableItem = ({ resource }: { resource: any }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-    } = useSortable({ id: resource.id });
+    const { attributes, listeners, setNodeRef, transform, transition } =
+      useSortable({ id: resource.id });
 
     const style = {
       transform: CSS.Transform.toString(transform),
@@ -87,17 +129,45 @@ const CreateCourse = () => {
           <Icon className="h-5 w-5 text-primary flex-shrink-0" />
           <div className="min-w-0 flex-1">
             <p className="font-medium text-sm truncate">{resource.title}</p>
-            <p className="text-xs text-muted-foreground truncate">{resource.url}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {resource.url}
+            </p>
           </div>
         </div>
         <span className="text-xs text-muted-foreground px-2 py-1 bg-secondary rounded">
           {resources.findIndex((r) => r.id === resource.id) + 1}
         </span>
-        <Button size="sm" variant="ghost" onClick={() => removeResource(resource.id)}>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => removeResource(resource.id)}
+        >
           <X className="h-4 w-4" />
         </Button>
       </div>
     );
+  };
+
+  const removeResource = (id: string) => {
+    setResources(resources.filter((resource) => resource.id !== id));
+  };
+
+  const addTag = () => {
+    const trimmed = newTag.trim();
+    if (trimmed && !courseDetails.tags.includes(trimmed)) {
+      setCourseDetails((prev) => ({
+        ...prev,
+        tags: [...prev.tags, trimmed],
+      }));
+      setNewTag("");
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setCourseDetails((prev) => ({
+      ...prev,
+      tags: prev.tags.filter((tag) => tag !== tagToRemove),
+    }));
   };
 
   const addResource = async () => {
@@ -121,10 +191,11 @@ const CreateCourse = () => {
         });
 
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Failed to expand playlist");
+        if (!response.ok)
+          throw new Error(data.error || "Failed to expand playlist");
 
         const newResources = data.videos.map((vid: any, i: number) => ({
-          id: resources.length + i + 1,
+          id: `${Date.now()}-${i}`,
           type: "youtube",
           url: vid.url,
           title: vid.title,
@@ -141,7 +212,7 @@ const CreateCourse = () => {
       }
     } else {
       const newResource = {
-        id: resources.length + 1,
+        id: `${Date.now()}`,
         type: newResourceUrl.includes("youtube") ? "youtube" : "article",
         title: "New Resource",
         url: newResourceUrl,
@@ -152,41 +223,27 @@ const CreateCourse = () => {
     }
   };
 
-  const removeResource = (id: number) => {
-    setResources(resources.filter((resource) => resource.id !== id));
-  };
-
-  const addTag = () => {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      setTags([...tags, newTag.trim()]);
-      setNewTag("");
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter((tag) => tag !== tagToRemove));
-  };
-
-  const handlePublish = async () => {
+  const handleSave = async () => {
     setLoading(true);
     try {
-      const userSession = await supabase.auth.getSession();
-      const token = userSession.data.session?.access_token;
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
 
       const payload = {
-        title: courseTitle,
-        description: courseDescription,
-        tags,
-        resources: resources.map((res, index) => ({
-          url: res.url,
-          typeOfResc: res.type,
-          title: res.title,
-          description: res.description,
-          order: index + 1,
+        title: courseDetails.title,
+        description: courseDetails.description,
+        tags: courseDetails.tags,
+        resources: resources.map((r, index) => ({
+          id: r.id,
+          url: r.url,
+          typeOfResc: r.type,
+          title: r.title,
+          description: r.description,
+          order: index,
         })),
       };
 
-      const response = await fetch(`${serverurl}/v1/course/create-course`, {
+      await fetch(`${serverurl}/v1/course/update-course/${courseId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -195,17 +252,35 @@ const CreateCourse = () => {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to create course");
-
-      navigate(`/course/${data.course._id}`, {
-        state: { course: data.course },
+      navigate(`/course/${courseId}`, {
+        state: { course: courseDetails },
       });
-    } catch (error) {
-      console.error("Publish error:", error);
-      alert("Failed to publish course");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+
+      const res = await fetch(`${serverurl}/v1/course/delete-course/${courseId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to delete course");
+      }
+
+      navigate("/dashboard");
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting course. Please try again.");
     }
   };
 
@@ -214,14 +289,11 @@ const CreateCourse = () => {
       <Navigation />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Create Course</h1>
-          <p className="text-muted-foreground mt-2">
-            Build your structured learning journey from scattered resources
-          </p>
+          <h1 className="text-3xl font-bold text-foreground">Edit Course</h1>
+          <p className="text-muted-foreground mt-2">Make changes to your course</p>
         </div>
 
         <div className="space-y-8">
-          {/* Course Details */}
           <Card>
             <CardHeader>
               <CardTitle>Course Details</CardTitle>
@@ -231,59 +303,55 @@ const CreateCourse = () => {
                 <Label htmlFor="title">Course Title</Label>
                 <Input
                   id="title"
-                  placeholder="e.g., Complete React Development"
-                  value={courseTitle}
-                  onChange={(e) => setCourseTitle(e.target.value)}
+                  value={courseDetails.title}
+                  onChange={(e) =>
+                    setCourseDetails((prev) => ({
+                      ...prev,
+                      title: e.target.value,
+                    }))
+                  }
                 />
               </div>
-
               <div>
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
-                  placeholder="Describe what this course covers..."
-                  value={courseDescription}
-                  onChange={(e) => setCourseDescription(e.target.value)}
+                  value={courseDetails.description}
+                  onChange={(e) =>
+                    setCourseDetails((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
                   rows={3}
                 />
               </div>
-
               <div>
                 <Label>Tags</Label>
                 <div className="flex flex-wrap gap-2 mb-2">
-                  {tags.map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant="secondary"
-                      className="flex items-center gap-1"
-                    >
+                  {/* {courseDetails.tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="flex items-center gap-1">
                       {tag}
-                      <X
-                        className="h-3 w-3 cursor-pointer"
-                        onClick={() => removeTag(tag)}
-                      />
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => removeTag(tag)} />
                     </Badge>
-                  ))}
+                  ))} */}
                 </div>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Add a tag..."
                     value={newTag}
                     onChange={(e) => setNewTag(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && addTag()}
+                    placeholder="Add a tag"
                   />
-                  <Button onClick={addTag} variant="outline" size="sm">
-                    Add
-                  </Button>
+                  <Button onClick={addTag} variant="outline" size="sm">Add</Button>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Add Resources */}
           <Card>
             <CardHeader>
-              <CardTitle>Add Resources</CardTitle>
+              <CardTitle>Add More Resources</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex gap-2 items-center">
@@ -297,7 +365,7 @@ const CreateCourse = () => {
                   {playlistLoading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Adding playlist...
+                      Adding...
                     </>
                   ) : (
                     <>
@@ -310,10 +378,9 @@ const CreateCourse = () => {
             </CardContent>
           </Card>
 
-          {/* Course Content */}
           <Card>
             <CardHeader>
-              <CardTitle>Course Content ({resources.length} items)</CardTitle>
+              <CardTitle>Course Content ({resources.length})</CardTitle>
             </CardHeader>
             <CardContent>
               <DndContext
@@ -338,16 +405,22 @@ const CreateCourse = () => {
             </CardContent>
           </Card>
 
-          {/* Actions */}
-          <div className="flex justify-between">
-            <Button variant="outline">Save as Draft</Button>
-            <div className="flex gap-3">
-              <Button variant="outline">Preview Course</Button>
-              <Button onClick={handlePublish} disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {loading ? "Publishing..." : "Publish Course"}
-              </Button>
-            </div>
+          <div className="flex justify-between items-center">
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (confirm("Are you sure you want to delete this course? This action cannot be undone.")) {
+                  handleDelete();
+                }
+              }}
+            >
+              Delete Course
+            </Button>
+
+            <Button onClick={handleSave} disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading ? "Saving..." : "Save Changes"}
+            </Button>
           </div>
         </div>
       </div>
@@ -355,4 +428,4 @@ const CreateCourse = () => {
   );
 };
 
-export default CreateCourse;
+export default EditCourse;

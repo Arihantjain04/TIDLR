@@ -12,6 +12,7 @@ import {serverurl} from "../../urls.json";
 interface Course {
   _id: string;
   title: string;
+  description: string;
   tags: string[];
   numberOfResc: number;
   lastOpened?: Date | string;
@@ -26,7 +27,7 @@ interface FormattedCourse {
   totalItems: number;
   completedResc: number;
   lastAccessed: string;
-  category: string;
+  tags: string;
 }
 
 const Dashboard = () => {
@@ -91,6 +92,7 @@ const Dashboard = () => {
             ({
               id: course._id,
               title: course.title,
+              description: course.description,
               progress: calculateProgress(course),
               totalItems: course.numberOfResc || 0,
               completedResc:
@@ -99,7 +101,7 @@ const Dashboard = () => {
                   (calculateProgress(course) / 100) * (course.numberOfResc || 0)
                 ),
               lastAccessed: formatLastAccessed(course.lastOpened),
-              category: course.tags.length > 0 ? course.tags[0] : "General",
+              tags: course.tags.length > 0 ? course.tags[0] : "General",
             } as FormattedCourse)
         ); // Explicitly type the object as FormattedCourse
 

@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import CreateCourse from "./pages/CreateCourse";
+import EditCourse from "./pages/EditCourse";
 import Course from "./pages/Course";
 import Auth from "./pages/Auth";
 import Interests from "./pages/Interests";
@@ -48,6 +49,14 @@ const App = () => (
                 <Course />
               </ProtectedRoute>
             } 
+          />
+          <Route
+            path="/edit-course/:id"
+            element={
+              <ProtectedRoute>
+                <EditCourse />
+              </ProtectedRoute>
+            }
           />
           <Route path="*" element={<NotFound />} />
         </Routes>
