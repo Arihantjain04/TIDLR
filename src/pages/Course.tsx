@@ -77,6 +77,9 @@ const Course = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // console.log("Course ID from params:", course);
+  
+
   const courseDetails: CourseDetails = {
     id: course.id,
     title: course.title,
@@ -462,11 +465,11 @@ const Course = () => {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 mb-4">
-                {courseDetails.tags.map((tag) => (
+              {/* {courseDetails ? courseDetails.tags.map((tag) => (
                   <Badge key={tag} variant="secondary">
                     {tag}
                   </Badge>
-                ))}
+                )): <></>} */}
               </div>
             </div>
             <div className="flex gap-2">
