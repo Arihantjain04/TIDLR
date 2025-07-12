@@ -22,21 +22,26 @@ const Auth = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
         if (error) throw error;
 
         if (session) {
-          const { data: { user }, error: userError } = 
-            await supabase.auth.getUser(session.access_token);
-          
+          const {
+            data: { user },
+            error: userError,
+          } = await supabase.auth.getUser(session.access_token);
+
           if (userError) throw userError;
-          
+
           const now = Math.floor(Date.now() / 1000);
           if (session.expires_at && now > session.expires_at) {
             await supabase.auth.refreshSession();
           }
-          
+
           navigate("/dashboard");
         }
       } catch (error) {
