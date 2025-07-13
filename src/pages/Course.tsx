@@ -7,6 +7,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import styles from "./Loader.module.css";
+import { Loader2 } from "lucide-react";
 
 import {
   Play,
@@ -75,10 +76,10 @@ const Course = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingN, setLoadingN] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // console.log("Course ID from params:", course);
-  
 
   const courseDetails: CourseDetails = {
     id: course.id,
@@ -245,10 +246,10 @@ const Course = () => {
 
   const [notesVisible, setNotesVisible] = useState(false);
   const [notes, setNotes] = useState<Record<string, string>>({});
-  
+
   const editor = useEditor({
     extensions: [StarterKit, Underline],
-    content: "", 
+    content: "",
     editable: notesVisible,
     onUpdate: ({ editor }) => {
       if (!currentId) return;
@@ -256,50 +257,50 @@ const Course = () => {
       setNotes((prev) => ({ ...prev, [currentId]: html }));
     },
   });
-  
+
   useEffect(() => {
     const fetchNotes = async () => {
       if (!currentId || !editor) return;
-  
+
       const token = getSupabaseToken();
       if (!token) return;
-  
+
       try {
         const res = await axios.get(
           `${serverurl}/v1/notes/get-notes-by-resc/${currentId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-  
+
         const html = res.data?.content || "<p></p>";
-  
+
         setNotes((prev) => ({ ...prev, [currentId]: html }));
         editor.commands.setContent(html);
 
         // console.log("Fetched notes for resource:", currentId, res);
-        
       } catch (err) {
         console.error("Failed to fetch notes:", err);
       }
     };
-  
+
     fetchNotes();
   }, [currentId, editor]);
-  
+
   useEffect(() => {
     if (editor) editor.setEditable(notesVisible);
   }, [notesVisible, editor]);
-  
+
   const onSaveNotes = async () => {
+    setLoadingN(true);
     if (!editor || !currentId) return;
-  
+
     const html = editor.getHTML();
     const plainText = editor.getText();
-  
+
     setNotes((prev) => ({ ...prev, [currentId]: html }));
-  
+
     const token = getSupabaseToken();
     if (!token) return;
-  
+
     try {
       await axios.post(
         `${serverurl}/v1/notes/save-notes-for-resc/${currentId}`,
@@ -307,11 +308,12 @@ const Course = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       // console.log("Notes saved successfully");
+      setLoadingN(false);
     } catch (err) {
       console.error("Failed to save notes:", err);
     }
   };
-  
+
   useEffect(() => {
     const tag = document.createElement("script");
     tag.src = "https://www.youtube.com/iframe_api";
@@ -465,7 +467,7 @@ const Course = () => {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 mb-4">
-              {/* {courseDetails ? courseDetails.tags.map((tag) => (
+                {/* {courseDetails ? courseDetails.tags.map((tag) => (
                   <Badge key={tag} variant="secondary">
                     {tag}
                   </Badge>
@@ -483,10 +485,10 @@ const Course = () => {
                   Edit Course
                 </Link>
               </Button>
-              <Button variant="outline" size="sm">
+              {/* <Button variant="outline" size="sm">
                 <Bookmark className="h-4 w-4 mr-2" />
                 Save
-              </Button>
+              </Button> */}
               <Button variant="outline" size="sm">
                 <Share className="h-4 w-4 mr-2" />
                 Share
@@ -655,7 +657,11 @@ const Course = () => {
 
                         <div className="flex justify-end">
                           <Button size="sm" onClick={onSaveNotes}>
-                            Save Notes
+                            {/* Save Notes */}
+                            {loadingN && (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            )}
+                            {loadingN ? "Saving..." : "Save notes"}
                           </Button>
                         </div>
                       </div>
@@ -701,7 +707,7 @@ const Course = () => {
                   <CardTitle>Course Outline</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="space-y-1">
+                  <div className="space-y-1 overflow-scroll h-[calc(100vh-200px)]">
                     {resources.map((resource, index) => {
                       const Icon = getResourceIcon(resource.url);
                       const isActive = index === currentResource;
@@ -710,12 +716,13 @@ const Course = () => {
                         <button
                           key={resource._id}
                           onClick={() => setCurrentResource(index)}
-                          className={`w-full text-left p-4 hover:bg-accent transition-colors border-l-2 ${isActive
+                          className={`w-full text-left p-4 hover:bg-accent transition-colors border-l-2 ${
+                            isActive
                               ? "border-primary bg-accent/50"
                               : isCompleted
-                                ? "border-green-500"
-                                : "border-transparent"
-                            }`}
+                              ? "border-green-500"
+                              : "border-transparent"
+                          }`}
                         >
                           <div className="flex items-start gap-3">
                             <div className="flex-shrink-0 mt-0.5">
@@ -731,10 +738,10 @@ const Course = () => {
                                 <span className="text-sm font-medium truncate">
                                   {resource.metaData?.title || resource.title
                                     ? truncateText(
-                                      resource.metaData?.title ||
-                                      resource.title,
-                                      6
-                                    )
+                                        resource.metaData?.title ||
+                                          resource.title,
+                                        6
+                                      )
                                     : "Untitled Resource"}
                                 </span>
                               </div>

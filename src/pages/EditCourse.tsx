@@ -378,7 +378,7 @@ const EditCourse = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="overflow-scroll h-[calc(40vh)]">
             <CardHeader>
               <CardTitle>Course Content ({resources.length})</CardTitle>
             </CardHeader>
@@ -405,7 +405,7 @@ const EditCourse = () => {
             </CardContent>
           </Card>
 
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between sticky bottom-0 bg-background p-4 border-t border-border">
             <Button
               variant="destructive"
               onClick={() => {

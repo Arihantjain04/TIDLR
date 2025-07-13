@@ -168,6 +168,10 @@ const CreateCourse = () => {
   };
 
   const handlePublish = async () => {
+    if (resources.length > 25) {
+      alert("You can only add upto 25 resources at a time!");
+      return;
+    }
     setLoading(true);
     try {
       const userSession = await supabase.auth.getSession();
@@ -311,7 +315,7 @@ const CreateCourse = () => {
           </Card>
 
           {/* Course Content */}
-          <Card>
+          <Card className="overflow-scroll h-[calc(40vh)]">
             <CardHeader>
               <CardTitle>Course Content ({resources.length} items)</CardTitle>
             </CardHeader>
@@ -339,10 +343,10 @@ const CreateCourse = () => {
           </Card>
 
           {/* Actions */}
-          <div className="flex justify-between">
-            <Button variant="outline">Save as Draft</Button>
+          <div className="flex justify-between sticky bottom-0 bg-background p-4 border-t border-border">
+            {/* <Button variant="outline">Save as Draft</Button> */}
             <div className="flex gap-3">
-              <Button variant="outline">Preview Course</Button>
+              {/* <Button variant="outline">Preview Course</Button> */}
               <Button onClick={handlePublish} disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {loading ? "Publishing..." : "Publish Course"}
