@@ -1,37 +1,39 @@
-
 import { Button } from "@/components/ui/button";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BookOpen, Plus, Home, User, LogOut } from "lucide-react";
+import {
+  BookOpen,
+  Plus,
+  Home,
+  User,
+  LogOut,
+  Settings,
+  Wrench,
+} from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
 
 const Navigation = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { toast } = useToast();
+
+  // Mock admin check - you'll replace this with your backend logic
+  const isAdmin = false; // For demo purposes, always show admin tab
 
   const navItems = [
     { path: "/", label: "Home", icon: Home },
     { path: "/dashboard", label: "Dashboard", icon: BookOpen },
+    { path: "/workshop", label: "Workshop", icon: Wrench },
     { path: "/create", label: "Create Course", icon: Plus },
   ];
 
+  // Add admin panel for admin users
+  if (isAdmin) {
+    navItems.push({ path: "/admin", label: "Admin", icon: Settings });
+  }
+
   const handleSignOut = async () => {
-    try {
-      await signOut();
-      toast({
-        title: "Signed out successfully",
-        description: "See you next time!",
-      });
-      navigate("/");
-    } catch (error: any) {
-      toast({
-        title: "Error signing out",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+    await signOut();
+    navigate("/");
   };
 
   return (
@@ -40,35 +42,42 @@ const Navigation = () => {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <Link to="/" className="text-2xl font-bold text-primary">
-              Tidlrs
+              Tidlr
             </Link>
           </div>
-          
+
           <div className="flex items-center space-x-4">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              
-              return (
-                <Button
-                  key={item.path}
-                  variant={isActive ? "default" : "ghost"}
-                  size="sm"
-                  asChild
-                >
-                  <Link to={item.path} className="flex items-center gap-2">
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                </Button>
-              );
-            })}
-            
+            {user &&
+              navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.path;
+
+                return (
+                  <Button
+                    key={item.path}
+                    variant={isActive ? "default" : "ghost"}
+                    size="sm"
+                    asChild
+                  >
+                    <Link to={item.path} className="flex items-center gap-2">
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  </Button>
+                );
+              })}
+
             {user ? (
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" size="sm">
+                  <User className="h-4 w-4 mr-2" />
+                  {user.email}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </Button>
+              </div>
             ) : (
               <Button variant="outline" size="sm" asChild>
                 <Link to="/auth">
