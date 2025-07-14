@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +12,9 @@ import Auth from "./pages/Auth";
 import Interests from "./pages/Interests";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
+import Workshop from "./pages/Workshop";
+import CuratedCourse from "./pages/CuratedCourse";
+import AdminPanel from "./pages/AdminPanel";
 
 const queryClient = new QueryClient();
 
@@ -26,29 +28,39 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/interests" element={<Interests />} />
-          <Route 
-            path="/dashboard" 
+          <Route
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>
-            } 
+            }
           />
+          <Route path="/workshop" element={<Workshop />} />
+          <Route path="/workshop/:id" element={<CuratedCourse />} />
           <Route 
-            path="/create" 
+              path="/admin" 
+              element={
+                <ProtectedRoute>
+                  <AdminPanel />
+                </ProtectedRoute>
+              } 
+            />
+          <Route
+            path="/create"
             element={
               <ProtectedRoute>
                 <CreateCourse />
               </ProtectedRoute>
-            } 
+            }
           />
-          <Route 
-            path="/course/:id" 
+          <Route
+            path="/course/:id"
             element={
               <ProtectedRoute>
                 <Course />
               </ProtectedRoute>
-            } 
+            }
           />
           <Route
             path="/edit-course/:id"
