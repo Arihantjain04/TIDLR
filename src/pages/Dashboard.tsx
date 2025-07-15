@@ -119,6 +119,7 @@ const Dashboard = () => {
   const calculateProgress = (course: Course): number => {
     // Implement your actual progress calculation here
     // For now returning a random progress between 30-90%
+    if (!course.numberOfResc || course.numberOfResc === 0) return 0;
     return Math.floor(course.completedResc / course.numberOfResc * 100);
     // return Math.floor(Math.random() * 60) + 30;
   };
@@ -271,7 +272,11 @@ const Dashboard = () => {
                           <span>Progress</span>
                           <span>{course.progress}%</span>
                         </div>
-                        <Progress value={course.completedResc/course.totalItems *100} className="h-2" />
+                        <Progress value={
+                          course.totalItems === 0
+      ? 0
+      : (course.completedResc / course.totalItems) * 100
+                    } className="h-2" />
                       </div>
 
                       <div className="flex justify-between text-sm text-muted-foreground">
