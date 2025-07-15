@@ -14,6 +14,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -251,7 +252,7 @@ const EditCourse = () => {
         },
         body: JSON.stringify(payload),
       });
-
+      toast.success("Course updated successfully!");
       navigate(`/course/${courseId}`, {
         state: { course: courseDetails },
       });
@@ -276,7 +277,7 @@ const EditCourse = () => {
         const data = await res.json();
         throw new Error(data.message || "Failed to delete course");
       }
-
+      toast.success("Course deleted successfully!");
       navigate("/dashboard");
     } catch (err) {
       console.error(err);
