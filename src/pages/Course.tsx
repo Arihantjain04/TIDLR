@@ -132,8 +132,27 @@ const Course = () => {
       }
     };
 
+    const updateLastOpened = async () => {
+    try {
+      const token = getSupabaseToken();
+      if (!token) return;
+
+      await axios.post(
+        `${serverurl}/v1/course/update-last-opened/${courseId}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+    } catch (err) {
+      console.error("Failed to update lastOpened", err);
+    }
+  };
     if (courseId) {
       fetchResources();
+      updateLastOpened();
     }
   }, [courseId]);
 
