@@ -119,25 +119,34 @@ const Dashboard = () => {
   const calculateProgress = (course: Course): number => {
     // Implement your actual progress calculation here
     // For now returning a random progress between 30-90%
+    if (!course.numberOfResc || course.numberOfResc === 0) return 0;
     return Math.floor(course.completedResc / course.numberOfResc * 100);
     // return Math.floor(Math.random() * 60) + 30;
   };
 
   const formatLastAccessed = (date?: Date | string): string => {
-    if (!date) return "Never accessed";
+  if (!date) return "Never accessed";
 
-    const now = new Date();
-    const lastOpened = new Date(date);
-    const diffInMs = now.getTime() - lastOpened.getTime();
-    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+  const now = new Date();
+  const lastOpened = new Date(date);
+  const diffInMs = now.getTime() - lastOpened.getTime();
+  const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  const diffInDays = Math.floor(diffInHours / 24);
+  const diffInWeeks = Math.floor(diffInDays / 7);
 
-    if (diffInHours < 24) {
-      return `${diffInHours} hours ago`;
-    } else {
-      const diffInDays = Math.floor(diffInHours / 24);
-      return `${diffInDays} days ago`;
-    }
-  };
+  if (diffInMinutes < 1) return "Just now";
+  if (diffInMinutes < 60) return `${diffInMinutes} min${diffInMinutes === 1 ? "" : "s"} ago`;
+  if (diffInHours < 24) return `${diffInHours} hour${diffInHours === 1 ? "" : "s"} ago`;
+  if (diffInDays < 7) return `${diffInDays} day${diffInDays === 1 ? "" : "s"} ago`;
+  if (diffInWeeks < 4) return `${diffInWeeks} week${diffInWeeks === 1 ? "" : "s"} ago`;
+
+  // Else show absolute date (e.g. Jan 5)
+  return `on ${lastOpened.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  })}`;
+};
 
   
 
@@ -263,7 +272,11 @@ const Dashboard = () => {
                           <span>Progress</span>
                           <span>{course.progress}%</span>
                         </div>
-                        <Progress value={course.completedResc/course.totalItems *100} className="h-2" />
+                        <Progress value={
+                          course.totalItems === 0
+      ? 0
+      : (course.completedResc / course.totalItems) * 100
+                    } className="h-2" />
                       </div>
 
                       <div className="flex justify-between text-sm text-muted-foreground">
