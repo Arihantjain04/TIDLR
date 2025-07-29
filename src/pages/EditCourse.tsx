@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import React from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   DndContext,
@@ -106,7 +107,10 @@ const EditCourse = () => {
     }
   };
 
-  const SortableItem = ({ resource }: { resource: any }) => {
+  const SortableItem = React.memo(({ resource, onRemove }: {
+    resource: any;
+    onRemove: (id: string) => void;
+  }) => {
     const { attributes, listeners, setNodeRef, transform, transition } =
       useSortable({ id: resource.id });
 
@@ -136,22 +140,29 @@ const EditCourse = () => {
           </div>
         </div>
         <span className="text-xs text-muted-foreground px-2 py-1 bg-secondary rounded">
-          {resources.findIndex((r) => r.id === resource.id) + 1}
+          {resource.index}
         </span>
         <Button
           size="sm"
           variant="ghost"
-          onClick={() => removeResource(resource.id)}
+          onClick={() => onRemove(resource.id)}
         >
           <X className="h-4 w-4" />
         </Button>
       </div>
     );
-  };
+  },
+    (prevProps, nextProps) =>
+      prevProps.resource.id === nextProps.resource.id &&
+      prevProps.resource.index === nextProps.resource.index &&
+      prevProps.resource.title === nextProps.resource.title &&
+      prevProps.resource.url === nextProps.resource.url
+  );
 
-  const removeResource = (id: string) => {
-    setResources(resources.filter((resource) => resource.id !== id));
-  };
+  const removeResource = useCallback((id: string) => {
+    console.log("Removing", id);
+    setResources((prev) => prev.map((res) => res.id === id ? { ...res, markedForDeletion: true } : res));
+  }, []);
 
   const addTag = () => {
     const trimmed = newTag.trim();
@@ -234,14 +245,17 @@ const EditCourse = () => {
         title: courseDetails.title,
         description: courseDetails.description,
         tags: courseDetails.tags,
-        resources: resources.map((r, index) => ({
-          id: r.id,
-          url: r.url,
-          typeOfResc: r.type,
-          title: r.title,
-          description: r.description,
+        resources: resources.filter(res => !res.markedForDeletion).map((res, index) => ({
+          id: res.id,
+          url: res.url,
+          typeOfResc: res.type,
+          title: res.title,
+          description: res.description,
           order: index,
         })),
+        deletedResourceIds: resources
+          .filter(res => res.markedForDeletion)
+          .map(res => res.id),
       };
 
       await fetch(`${serverurl}/v1/course/update-course/${courseId}`, {
@@ -284,6 +298,7 @@ const EditCourse = () => {
       alert("Error deleting course. Please try again.");
     }
   };
+  const visibleResources = resources.filter(r => !r.markedForDeletion);
 
   return (
     <div className="min-h-screen bg-background">
@@ -395,10 +410,11 @@ const EditCourse = () => {
                   }
                 }}
               >
-                <SortableContext items={resources.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+                <SortableContext items={visibleResources.map((r) => r.id)} strategy={verticalListSortingStrategy}>
                   <div className="space-y-3">
-                    {resources.map((resource) => (
-                      <SortableItem key={resource.id} resource={resource} />
+                    {visibleResources.map((resource, i) => (
+                      <SortableItem key={resource.id} resource={{ ...resource, index: i + 1 }}
+                        onRemove={removeResource} />
                     ))}
                   </div>
                 </SortableContext>

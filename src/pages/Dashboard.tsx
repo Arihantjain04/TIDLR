@@ -1,13 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { BookOpen, Plus, Clock, TrendingUp, Play, Users } from "lucide-react";
+import { BookOpen, Plus, Clock, TrendingUp, Play, Users, Flame, Trophy } from "lucide-react";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import {serverurl} from "../../urls.json"; 
+import { serverurl } from "../../urls.json";
+import { useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Course {
   _id: string;
@@ -29,45 +31,105 @@ interface FormattedCourse {
   lastAccessed: string;
   tags: string;
 }
+interface Streak {
+  currentStreak: number;
+  longestStreak: number;
+}
+
+interface Profile {
+  streak: Streak;
+}
 
 const Dashboard = () => {
   const [myCourses, setMyCourses] = useState<FormattedCourse[]>([]);
+  const [allCourses, setAllCourses] = useState<FormattedCourse[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
 
   const navigate = useNavigate();
 
-  const getSupabaseToken = () => {
-    const supabaseSession = localStorage.getItem(
-      "sb-xxqoscilojosafuiwpxk-auth-token"
-    );
-    if (!supabaseSession) return null;
-
+  const getSupabaseToken = async (): Promise<string | null> => {
     try {
-      const session = JSON.parse(supabaseSession);
-      return session.access_token;
-    } catch (error) {
-      console.error("Error parsing Supabase session:", error);
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data.session) {
+        console.error("Failed to get Supabase session:", error);
+        return null;
+      }
+
+      const token = data.session?.access_token;
+      return token || null;
+    } catch (err) {
+      console.error("Error retrieving Supabase token:", err);
       return null;
     }
   };
 
-  const stats = [
-    {
-      label: "Courses in Progress",
-      value: myCourses.length.toString(),
-      icon: BookOpen,
-    },
-    { label: "Hours Learned", value: "47", icon: Clock },
-    { label: "Completion Rate", value: "85%", icon: TrendingUp },
-    { label: "Shared Courses", value: "2", icon: Users },
-  ];
+
+
+  const stats = useMemo(() => {
+    const totalCourses = allCourses.length;
+    const completedCourses = allCourses.filter(course => course.progress === 100).length;
+    const inProgressCount = totalCourses - completedCourses;
+    const completionRate = totalCourses > 0
+    ? `${Math.round((completedCourses / totalCourses) * 100)}%`
+    : "0%";
+    return [
+      {
+        label: "Courses in Progress",
+        value: inProgressCount.toString(),
+        icon: BookOpen,
+      },
+      { label: "Completion Rate", value: completionRate, icon: TrendingUp },
+      {
+        label: "Current Streak",
+        value: profile?.streak?.currentStreak
+          ? `${profile.streak.currentStreak} 🔥`
+          : "0",
+        icon: Flame,
+      },
+      {
+        label: "Longest Streak",
+        value: profile?.streak?.longestStreak
+          ? `${profile.streak.longestStreak} days`
+          : "0 days",
+        icon: Trophy,
+      },
+    ];
+  }, [profile, allCourses]);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const token = await getSupabaseToken();
+        if (!token) {
+          console.error("No Supabase token found");
+          return;
+        }
+
+        const res = await axios.get(`${serverurl}/v1/dashboard/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          withCredentials: true,
+        });
+
+        console.log("Fetched profile:", res.data);
+        setProfile(res.data);
+      } catch (err) {
+        console.error("Error fetching user profile:", err);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   useEffect(() => {
     const fetchCourses = async () => {
       try {
         setLoading(true);
-        const token = getSupabaseToken();
+        const session = await supabase.auth.getSession();
+        const token = session.data.session?.access_token;
         if (!token) {
           console.error("No Supabase token found");
           return;
@@ -115,6 +177,45 @@ const Dashboard = () => {
 
     fetchCourses();
   }, [showAll]);
+  useEffect(() => {
+    const fetchAllCourses = async () => {
+      try {
+        const token = await getSupabaseToken();
+        if (!token) return;
+
+        const response = await axios.get<Course[]>(
+          `${serverurl}/v1/course/get-all-user-courses?limit=0`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            withCredentials: true,
+          }
+        );
+
+        const formatted = response.data.map((course) => ({
+          id: course._id,
+          title: course.title,
+          description: course.description,
+          progress: calculateProgress(course),
+          totalItems: course.numberOfResc || 0,
+          completedResc:
+            course.completedResc ||
+            Math.floor(
+              (calculateProgress(course) / 100) * (course.numberOfResc || 0)
+            ),
+          lastAccessed: formatLastAccessed(course.lastOpened),
+          tags: course.tags.length > 0 ? course.tags[0] : "General",
+        })) as FormattedCourse[];
+
+        setAllCourses(formatted);
+      } catch (err) {
+        console.error("Error fetching all courses for stats:", err);
+      }
+    };
+
+    fetchAllCourses();
+  }, []);
 
   const calculateProgress = (course: Course): number => {
     // Implement your actual progress calculation here
