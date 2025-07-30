@@ -1,6 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -12,7 +13,8 @@ import {
   Trash2, 
   Eye,
   Clock,
-  Star
+  Star,
+  Link
 } from "lucide-react";
 import Navigation from "@/components/Navigation";
 
@@ -113,6 +115,7 @@ const AdminPanel = () => {
     { label: "Curated Courses", value: analytics?.curatedCourses || 0, icon: Star },
     { label: "Active Users", value: analytics?.activeUsers || 0, icon: TrendingUp },
   ];
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background">
@@ -165,7 +168,7 @@ const AdminPanel = () => {
           <TabsContent value="curated" className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-foreground">Curated Courses</h2>
-              <Button>
+              <Button onClick={() => navigate("/create-workshop-course")}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Course
               </Button>
