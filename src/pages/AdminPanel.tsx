@@ -1,6 +1,8 @@
-
+import { useQuery } from "@tanstack/react-query";
+import { fetchUsers, fetchCuratedCourses, fetchAdminAnalytics, fetchUserCourses } from "@/lib/adminApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -12,84 +14,32 @@ import {
   Trash2, 
   Eye,
   Clock,
-  Star
+  Star,
+  Link
 } from "lucide-react";
 import Navigation from "@/components/Navigation";
 
 const AdminPanel = () => {
-  // Mock admin check - you'll replace this with your backend logic
   const isAdmin = true;
 
-  // Mock analytics data
-  const analytics = {
-    totalUsers: 1247,
-    totalCourses: 89,
-    curatedCourses: 6,
-    activeUsers: 873
-  };
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+    queryKey: ["analytics"],
+    queryFn: fetchAdminAnalytics
+  });
 
-  // Mock curated courses for management
-  const curatedCourses = [
-    {
-      id: "1",
-      title: "Complete React Development Path",
-      intro: "This path was carefully curated to take you from React beginner to confident developer.",
-      curator_name: "Sarah Chen",
-      estimated_hours: 24,
-      is_featured: true,
-      is_published: true,
-      created_at: "2024-01-15T00:00:00.000Z"
-    },
-    {
-      id: "2",
-      title: "Full-Stack TypeScript Mastery",
-      intro: "TypeScript is essential for modern development. This curated path covers everything from basic types to advanced patterns.",
-      curator_name: "Alex Rodriguez",
-      estimated_hours: 18,
-      is_featured: true,
-      is_published: true,
-      created_at: "2024-01-10T00:00:00.000Z"
-    },
-    {
-      id: "3",
-      title: "Modern CSS & Design Systems",
-      intro: "Great design makes all the difference. This path teaches you to create stunning, accessible interfaces.",
-      curator_name: "Emily Johnson",
-      estimated_hours: 15,
-      is_featured: false,
-      is_published: false,
-      created_at: "2024-01-08T00:00:00.000Z"
-    }
-  ];
+  const { data: curatedCourses, isLoading: curatedCoursesLoading } = useQuery({
+    queryKey: ["curatedCourses"],
+    queryFn: fetchCuratedCourses
+  });
 
-  // Mock user courses for analytics
-  const userCourses = [
-    {
-      id: "uc1",
-      title: "Advanced JavaScript Patterns",
-      description: "Deep dive into advanced JavaScript concepts and design patterns",
-      is_public: true,
-      tags: ["JavaScript", "Advanced"],
-      created_at: "2024-01-12T00:00:00.000Z"
-    },
-    {
-      id: "uc2",
-      title: "Vue.js Complete Guide",
-      description: "Learn Vue.js from basics to advanced topics with practical projects",
-      is_public: false,
-      tags: ["Vue.js", "Frontend"],
-      created_at: "2024-01-11T00:00:00.000Z"
-    },
-    {
-      id: "uc3",
-      title: "Database Design Fundamentals",
-      description: "Master database design principles and SQL optimization techniques",
-      is_public: true,
-      tags: ["Database", "SQL"],
-      created_at: "2024-01-09T00:00:00.000Z"
-    }
-  ];
-
+  const { data: users, isLoading: usersLoading } = useQuery({
+    queryKey: ["users"],
+    queryFn: fetchUsers
+  });
+  const { data: userCourses, isLoading: userCoursesLoading } = useQuery({
+    queryKey: ["userCourses"],
+    queryFn: fetchUserCourses,
+  });
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-background">
@@ -113,6 +63,7 @@ const AdminPanel = () => {
     { label: "Curated Courses", value: analytics?.curatedCourses || 0, icon: Star },
     { label: "Active Users", value: analytics?.activeUsers || 0, icon: TrendingUp },
   ];
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background">
@@ -165,7 +116,7 @@ const AdminPanel = () => {
           <TabsContent value="curated" className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-foreground">Curated Courses</h2>
-              <Button>
+              <Button onClick={() => navigate("/create-workshop-course")}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Course
               </Button>
@@ -173,25 +124,25 @@ const AdminPanel = () => {
 
             <div className="grid grid-cols-1 gap-4">
               {curatedCourses?.map((course) => (
-                <Card key={course.id}>
+                <Card key={course._id}>
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <h3 className="text-lg font-semibold">{course.title}</h3>
-                          {course.is_featured && <Star className="h-4 w-4 text-yellow-500 fill-current" />}
-                          <Badge variant={course.is_published ? "default" : "secondary"}>
+                          {course.isFeatured && <Star className="h-4 w-4 text-yellow-500 fill-current" />}
+                          {/* <Badge variant={course.is_Published ? "default" : "secondary"}>
                             {course.is_published ? "Published" : "Draft"}
-                          </Badge>
+                          </Badge> */}
                         </div>
-                        <p className="text-muted-foreground text-sm mb-2">by {course.curator_name}</p>
-                        <p className="text-muted-foreground mb-3 line-clamp-2">{course.intro}</p>
+                        <p className="text-muted-foreground text-sm mb-2">by {course.curatorName}</p>
+                        <p className="text-muted-foreground mb-3 line-clamp-2">{course.description}</p>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
-                            {course.estimated_hours}h
+                            {course.estimatedTime}h
                           </div>
-                          <span>Created {new Date(course.created_at!).toLocaleDateString()}</span>
+                          <span>Created {new Date(course.createdAt!).toLocaleDateString()}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-4">
@@ -228,7 +179,7 @@ const AdminPanel = () => {
                           <Badge variant={course.is_public ? "default" : "secondary"}>
                             {course.is_public ? "Public" : "Private"}
                           </Badge>
-                          <span>Created {new Date(course.created_at!).toLocaleDateString()}</span>
+                          <span>Created {new Date(course.createdAt!).toLocaleDateString()}</span>
                           {course.tags && course.tags.length > 0 && (
                             <div className="flex gap-1">
                               {course.tags.slice(0, 2).map((tag) => (
