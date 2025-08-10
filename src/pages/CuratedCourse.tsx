@@ -74,8 +74,8 @@ const CuratedCourse = () => {
     );
   }
 
-  const getResourceIcon = (type: string) => {
-    switch (type.toLowerCase()) {
+  const getResourceIcon = (type?: string) => {
+    switch (type?.toLowerCase()) {
       case 'video':
         return Video;
       case 'article':
@@ -142,7 +142,7 @@ const CuratedCourse = () => {
           <CardContent>
             <div className="bg-muted/50 p-4 rounded-lg">
               <h4 className="font-medium mb-2">Why this course was curated:</h4>
-              <p className="text-muted-foreground">{course.description}</p>
+              <p className="text-muted-foreground">{course.whyCurated}</p>
             </div>
           </CardContent>
         </Card>
@@ -153,6 +153,9 @@ const CuratedCourse = () => {
           
           <div className="space-y-4">
             {resources?.map((resource, index) => {
+              console.log("resource object:", resource);
+  console.log("resource type:", resource.type_of_resource);
+
               const ResourceIcon = getResourceIcon(resource.type_of_resource);
               return (
                 <Card key={resource.id} className="hover:shadow-md transition-shadow">
@@ -165,9 +168,9 @@ const CuratedCourse = () => {
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
                             <h3 className="font-semibold text-lg mb-2">{resource.title}</h3>
-                            {resource.description && (
+                            {/* {resource.description && (
                               <p className="text-muted-foreground mb-3">{resource.description}</p>
-                            )}
+                            )} */}
                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
                               <Badge variant="outline" className="capitalize">
                                 {resource.type_of_resource}
@@ -181,7 +184,7 @@ const CuratedCourse = () => {
                             </div>
                           </div>
                           <Button asChild>
-                            <a href={resource.url} target="_blank" rel="noopener noreferrer">
+                            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="flex items-center">
                               <ResourceIcon className="h-4 w-4 mr-2" />
                               Open
                             </a>

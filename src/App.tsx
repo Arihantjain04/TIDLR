@@ -16,6 +16,7 @@ import Workshop from "./pages/Workshop";
 import CuratedCourse from "./pages/CuratedCourse";
 import AdminPanel from "./pages/AdminPanel";
 import CreateWorkshopCourse from "./pages/CreateWorkshopCourse";
+import EditWorkshopCourse from "./pages/EditWorkshopCourse";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +77,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <CreateWorkshopCourse />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/edit-workshop-course/:id"
+            element={
+              <ProtectedRoute>
+                <EditWorkshopCourse />
               </ProtectedRoute>
             }
           />

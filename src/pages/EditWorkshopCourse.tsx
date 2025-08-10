@@ -1,18 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { fetchCourseById, fetchCourseResources } from "@/lib/adminApi";
 import {
   ArrowLeft,
   Plus,
-  Upload,
   X,
   GripVertical,
   Loader2,
   FileText,
   Link as LinkIcon,
+  Save,
+  Edit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,15 +64,18 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-export default function CreateWorkshopCourse() {
+export default function EditWorkshopCourse() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { id } = useParams();
   const [currentTag, setCurrentTag] = useState("");
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [newResourceUrl, setNewResourceUrl] = useState("");
   const [resources, setResources] = useState<any[]>([]);
+  const [resourcesToDelete, setResourcesToDelete] = useState([]);
   const [playlistLoading, setPlaylistLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -85,15 +91,117 @@ export default function CreateWorkshopCourse() {
     },
   });
 
+  // Fetch course data
+  const { data: course, isLoading: courseLoading } = useQuery({
+    queryKey: ["course", id],
+    queryFn: () => fetchCourseById(id!),
+    enabled: !!id,
+  });
+
+  // Fetch course resources
+  const { data: courseResources = [], isLoading: resourcesLoading } = useQuery({
+    queryKey: ["course-resources", id],
+    queryFn: () => fetchCourseResources(id!),
+    enabled: !!id,
+  });
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor)
   );
 
+  // Pre-populate form when course data is loaded
+  useEffect(() => {
+    if (course) {
+      form.reset({
+        title: course.title || "",
+        description: course.description || "",
+        isFeatured: course.isFeatured || false,
+        whyCurated: course.whyCurated || "",
+        tags: course.tags || [],
+        numberOfResc: course.numberOfResc || 0,
+        curatorName: course.curatorName || "",
+        estimatedTime: course.estimatedTime || 0,
+      });
+
+      // Set image previews if they exist
+      if (course.cover) {
+        setCoverPreview(course.cover);
+      }
+      if (course.curatorAvatar) {
+        setAvatarPreview(course.curatorAvatar);
+      }
+    }
+  }, [course, form]);
+
+  // Set resources when they're loaded
+  useEffect(() => {
+    if (courseResources && courseResources.length > 0) {
+      const formattedResources = courseResources.filter(resource => resource.url && resource.url.trim() !== "").map((resource, index) => ({
+        id: resource.id || index + 1,
+        type: resource.type_of_resource === "video" ? "youtube" : resource.type_of_resource || "article",
+        title: resource.title || "Untitled Resource",
+        url: resource.url,
+        description: resource.description || "",
+        estimated_minutes: resource.estimated_minutes || 0,
+      }));
+      setResources(formattedResources);
+    }
+  }, [courseResources]);
+
   const onSubmit = async (data: FormData) => {
+    if (!id) {
+      toast({
+        title: "Error",
+        description: "Course ID is missing.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // Validate resources before sending
+    console.log('Resources before validation:', resources); // Debug log
+
+    const invalidResources = resources.filter(resource =>
+      !resource.url ||
+      typeof resource.url !== 'string' ||
+      resource.url.trim() === '' ||
+      resource.url === 'undefined' ||
+      resource.url === 'null'
+    );
+
+    if (invalidResources.length > 0) {
+      console.error('Invalid resources found:', invalidResources);
+      toast({
+        title: "Validation Error",
+        description: `${invalidResources.length} resource(s) have invalid URLs. Please check all resources have valid URLs.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Additional URL format validation
+    const resourcesWithBadUrls = resources.filter(resource => {
+      try {
+        new URL(resource.url);
+        return false; // URL is valid
+      } catch {
+        return true; // URL is invalid
+      }
+    });
+
+    if (resourcesWithBadUrls.length > 0) {
+      console.error('Resources with malformed URLs:', resourcesWithBadUrls);
+      toast({
+        title: "Validation Error",
+        description: `${resourcesWithBadUrls.length} resource(s) have malformed URLs. Please enter valid URLs.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
     const formDataToSend = new FormData();
-    const tags = form.watch("tags");
-console.log("Current tags:", tags);
     formDataToSend.append("title", data.title);
     formDataToSend.append("description", data.description);
     formDataToSend.append("isFeatured", data.isFeatured.toString());
@@ -103,23 +211,39 @@ console.log("Current tags:", tags);
     if (data.estimatedTime !== undefined && data.estimatedTime !== null) {
       formDataToSend.append("estimatedTime", data.estimatedTime.toString());
     }
-    if (data.cover) {
+
+    // Only append files if they're actual File objects (new uploads)
+    if (data.cover && data.cover instanceof File) {
       formDataToSend.append("cover", data.cover);
     }
-    if (data.curatorAvatar) {
+    if (data.curatorAvatar && data.curatorAvatar instanceof File) {
       formDataToSend.append("curatorAvatar", data.curatorAvatar);
     }
 
-    // Tags as JSON string or multiple .append("tags", tag)
-    formDataToSend.append("resources", JSON.stringify(resources));
-    formDataToSend.append("tags", JSON.stringify(data.tags || []));
-    formDataToSend.append("numberOfResc", data.numberOfResc?.toString() || "0");
 
+    // Validate JSON serialization before sending
+    try {
+      const resourcesJson = JSON.stringify(resources);
+      const tagsJson = JSON.stringify(data.tags || []);
 
-    //debugging
-    for (let [key, value] of formDataToSend.entries()) {
-      console.log(`${key}:`, value);
+      console.log('Resources JSON to be sent:', resourcesJson); // Debug log
+
+      formDataToSend.append("resources", resourcesJson);
+      formDataToSend.append("tags", tagsJson);
+      formDataToSend.append("numberOfResc", data.numberOfResc?.toString() || "0");
+      formDataToSend.append("removedResources", JSON.stringify(resourcesToDelete));
+
+    } catch (jsonError) {
+      console.error('JSON serialization error:', jsonError);
+      toast({
+        title: "Error",
+        description: "Failed to process resource data. Please check all fields.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      return;
     }
+
     try {
       const {
         data: { session },
@@ -134,30 +258,39 @@ console.log("Current tags:", tags);
         });
         return;
       }
-      const response = await fetch("http://localhost:8000/v1/workshop", {
-        method: "POST",
+
+      const response = await fetch(`http://localhost:8000/v1/workshop/${id}`, {
+        method: "PUT",
         body: formDataToSend,
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
       });
+
       const result = await response.json();
 
+      console.log('Response status:', response.status);
+      console.log('Response result:', result);
+
       if (!response.ok) {
-        throw new Error(result.error || "Workshop course creation failed.");
+        throw new Error(result.error || "Workshop course update failed.");
       }
+      setResourcesToDelete([]);
       toast({
         title: "Success",
-        description: "Workshop course created successfully!",
+        description: "Workshop course updated successfully!",
       });
 
       navigate("/admin/workshop");
     } catch (error) {
+      console.error("Update error:", error);
       toast({
         title: "Error",
-        description: "Failed to create workshop course. Please try again.",
+        description: "Failed to update workshop course. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -166,10 +299,7 @@ console.log("Current tags:", tags);
       e.preventDefault();
       const currentTags = form.getValues("tags") || [];
       if (!currentTags.includes(currentTag.trim())) {
-        form.setValue("tags", [...currentTags, currentTag.trim()], {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
+        form.setValue("tags", [...currentTags, currentTag.trim()]);
       }
       setCurrentTag("");
     }
@@ -179,8 +309,7 @@ console.log("Current tags:", tags);
     const currentTags = form.getValues("tags") || [];
     form.setValue(
       "tags",
-      currentTags.filter((tag) => tag !== tagToRemove),
-      { shouldValidate: true, shouldDirty: true }
+      currentTags.filter((tag) => tag !== tagToRemove)
     );
   };
 
@@ -190,6 +319,23 @@ console.log("Current tags:", tags);
   ) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit for now
+        toast({
+          title: "Error",
+          description: "File size must be less than 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Error",
+          description: "Please select an image file",
+          variant: "destructive",
+        });
+        return;
+      }
       form.setValue(field, file);
       const reader = new FileReader();
       reader.onload = () => {
@@ -204,6 +350,9 @@ console.log("Current tags:", tags);
   };
 
   const SortableItem = ({ resource }: { resource: any }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedResource, setEditedResource] = useState(resource);
+
     const { attributes, listeners, setNodeRef, transform, transition } =
       useSortable({ id: resource.id });
 
@@ -218,8 +367,102 @@ console.log("Current tags:", tags);
       resource.type === "youtube"
         ? Youtube
         : resource.type === "article"
-        ? FileText
-        : LinkIcon;
+          ? FileText
+          : LinkIcon;
+
+    const handleSave = () => {
+      setResources(resources.map(r =>
+        r.id === resource.id ? editedResource : r
+      ));
+      setIsEditing(false);
+    };
+
+    const handleCancel = () => {
+      setEditedResource(resource);
+      setIsEditing(false);
+    };
+
+    if (isEditing) {
+      return (
+        <div
+          ref={setNodeRef}
+          style={style}
+          className="p-4 border border-border rounded-lg bg-card space-y-3"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+            <Icon className="h-5 w-5 text-primary" />
+            <span className="text-sm font-medium">Editing Resource #{resources.findIndex((r) => r.id === resource.id) + 1}</span>
+          </div>
+
+          <div className="space-y-3 pl-6">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Title</label>
+              <Input
+                value={editedResource.title}
+                onChange={(e) => setEditedResource({ ...editedResource, title: e.target.value })}
+                placeholder="Resource title"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1 block">URL</label>
+              <Input
+                value={editedResource.url}
+                onChange={(e) => setEditedResource({ ...editedResource, url: e.target.value })}
+                placeholder="https://..."
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1 block">Description</label>
+              <Textarea
+                value={editedResource.description || ""}
+                onChange={(e) => setEditedResource({ ...editedResource, description: e.target.value })}
+                placeholder="Brief description of the resource"
+                className="min-h-[80px]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Type</label>
+                <select
+                  value={editedResource.type}
+                  onChange={(e) => setEditedResource({ ...editedResource, type: e.target.value })}
+                  className="w-full px-3 py-2 border border-border rounded-md bg-background text-sm"
+                >
+                  <option value="video">Video</option>
+                  <option value="article">Article</option>
+                  <option value="youtube">YouTube</option>
+                  <option value="tutorial">Tutorial</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-1 block">Duration (min)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={editedResource.estimated_minutes || ""}
+                  onChange={(e) => setEditedResource({ ...editedResource, estimated_minutes: parseInt(e.target.value) || 0 })}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button size="sm" variant="outline" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleSave}>
+                Save
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div
@@ -237,25 +480,51 @@ console.log("Current tags:", tags);
             <p className="text-xs text-muted-foreground truncate">
               {resource.url}
             </p>
+            {resource.description && (
+              <p className="text-xs text-muted-foreground truncate mt-1">
+                {resource.description}
+              </p>
+            )}
           </div>
         </div>
-        <span className="text-xs text-muted-foreground px-2 py-1 bg-secondary rounded">
-          {resources.findIndex((r) => r.id === resource.id) + 1}
-        </span>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => removeResource(resource.id)}
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          {resource.estimated_minutes > 0 && (
+            <Badge variant="outline" className="text-xs">
+              {resource.estimated_minutes}m
+            </Badge>
+          )}
+          <span className="text-xs text-muted-foreground px-2 py-1 bg-secondary rounded">
+            {resources.findIndex((r) => r.id === resource.id) + 1}
+          </span>
+          {/* <Button
+            size="sm"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsEditing(true);
+            }}
+          >
+            Edit
+          </Button> */}
+          <Button
+            size="sm"
+            variant="ghost"
+            type="button"
+            onClick={() => removeResource(resource.id)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     );
   };
 
-  const removeResource = (id: number) => {
-    setResources(resources.filter((resource) => resource.id !== id));
-  };
+  const removeResource = (id: string) => {
+     // hide from UI
+  setResources(prev => prev.filter(r => (r._id ?? r.id) !== id));
+    // mark for deletion
+    setResourcesToDelete(prev => [...prev, id]);
+};
 
   const addResource = async () => {
     if (!newResourceUrl.trim()) return;
@@ -269,18 +538,20 @@ console.log("Current tags:", tags);
         await new Promise((resolve) => setTimeout(resolve, 1000));
         const newResources = [
           {
-            id: resources.length + 1,
+            id: Date.now() + 1,
             type: "youtube",
             url: newResourceUrl,
             title: "Playlist Video 1",
-            description: "Click to edit description",
+            description: "Click edit to update description",
+            estimated_minutes: 0,
           },
           {
-            id: resources.length + 2,
+            id: Date.now() + 2,
             type: "youtube",
             url: newResourceUrl,
             title: "Playlist Video 2",
-            description: "Click to edit description",
+            description: "Click edit to update description",
+            estimated_minutes: 0,
           },
         ];
         setResources([...resources, ...newResources]);
@@ -297,16 +568,58 @@ console.log("Current tags:", tags);
       }
     } else {
       const newResource = {
-        id: resources.length + 1,
-        type: newResourceUrl.includes("youtube") ? "youtube" : "article",
+        id: Date.now(),
+        type: newResourceUrl.includes("youtube") ? "youtube" : "video",
         title: "New Resource",
         url: newResourceUrl,
-        description: "Click to edit description",
+        description: "Click edit to update description",
+        estimated_minutes: 0,
       };
       setResources([...resources, newResource]);
       setNewResourceUrl("");
     }
   };
+
+  // Loading state
+  if (courseLoading || resourcesLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <div className="animate-pulse space-y-6">
+            <div className="h-8 bg-muted rounded w-64"></div>
+            <div className="h-32 bg-muted rounded"></div>
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-16 bg-muted rounded"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Course not found
+  if (!course) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <div className="text-center py-12">
+            <h3 className="text-lg font-medium mb-2">Course not found</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              This course may not exist or you don't have permission to edit it.
+            </p>
+            <Button asChild variant="outline">
+              <span onClick={() => navigate("/admin/workshop")}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Workshop
+              </span>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -316,16 +629,16 @@ console.log("Current tags:", tags);
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/admin")}
+            onClick={() => navigate("/admin/workshop")}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Create Workshop Course
+              Edit Workshop Course
             </h1>
             <p className="text-muted-foreground">
-              Add a new curated course to the workshop collection
+              Update the curated course information and resources
             </p>
           </div>
         </div>
@@ -440,8 +753,6 @@ console.log("Current tags:", tags);
                     />
                   </CardContent>
                 </Card>
-
-                
               </div>
 
               {/* Sidebar */}
@@ -460,9 +771,6 @@ console.log("Current tags:", tags);
                             <FormLabel className="text-base">
                               Featured Course
                             </FormLabel>
-                            {/* <FormDescription>
-                              Display this course prominently
-                            </FormDescription> */}
                           </div>
                           <FormControl>
                             <Switch
@@ -473,28 +781,6 @@ console.log("Current tags:", tags);
                         </FormItem>
                       )}
                     />
-
-                    {/* <FormField
-                      control={form.control}
-                      name="numberOfResc"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Number of Resources</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="0"
-                              placeholder="0"
-                              {...field}
-                              onChange={(e) =>
-                                field.onChange(parseInt(e.target.value) || 0)
-                              }
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    /> */}
 
                     <FormField
                       control={form.control}
@@ -540,7 +826,6 @@ console.log("Current tags:", tags);
                         onKeyDown={handleAddTag}
                       />
                     </div>
-                    <input type="hidden" {...form.register("tags")} />
                     <div className="flex flex-wrap gap-2">
                       {form.watch("tags")?.map((tag, index) => (
                         <Badge
@@ -567,26 +852,23 @@ console.log("Current tags:", tags);
             </div>
 
             <Card>
-                  <CardHeader>
-                    <CardTitle>Curator Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <FormField
-                      control={form.control}
-                      name="curatorName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Curator Name *</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="Enter curator name"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+              <CardHeader>
+                <CardTitle>Curator Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="curatorName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Curator Name *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter curator name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <FormField
                   control={form.control}
@@ -665,39 +947,50 @@ console.log("Current tags:", tags);
             </Card>
 
             {/* Course Content */}
-            <Card className="overflow-scroll h-[calc(40vh)] mt-6">
+            <Card className="mt-6">
               <CardHeader>
                 <CardTitle>Course Content ({resources.length} items)</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Drag to reorder resources. Click "Edit" to modify resource details.
+                </p>
               </CardHeader>
-              <CardContent>
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={({ active, over }) => {
-                    if (active.id !== over?.id) {
-                      const oldIndex = resources.findIndex(
-                        (r) => r.id === active.id
-                      );
-                      const newIndex = resources.findIndex(
-                        (r) => r.id === over?.id
-                      );
-                      setResources((items) =>
-                        arrayMove(items, oldIndex, newIndex)
-                      );
-                    }
-                  }}
-                >
-                  <SortableContext
-                    items={resources.map((r) => r.id)}
-                    strategy={verticalListSortingStrategy}
+              <CardContent className="max-h-[50vh] overflow-y-auto">
+                {resources.length > 0 ? (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={({ active, over }) => {
+                      if (active.id !== over?.id) {
+                        const oldIndex = resources.findIndex(
+                          (r) => r.id === active.id
+                        );
+                        const newIndex = resources.findIndex(
+                          (r) => r.id === over?.id
+                        );
+                        setResources((items) =>
+                          arrayMove(items, oldIndex, newIndex)
+                        );
+                      }
+                    }}
                   >
-                    <div className="space-y-3">
-                      {resources.map((resource) => (
-                        <SortableItem key={resource.id} resource={resource} />
-                      ))}
-                    </div>
-                  </SortableContext>
-                </DndContext>
+                    <SortableContext
+                      items={resources.map((r) => r.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-3">
+                        {resources.map((resource) => (
+                          <SortableItem key={resource.id} resource={resource} />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>No resources added yet</p>
+                    <p className="text-sm">Add your first resource above</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -707,14 +1000,27 @@ console.log("Current tags:", tags);
                 type="button"
                 variant="outline"
                 onClick={() => navigate("/admin/workshop")}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit">Create Course</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Update Course
+                  </>
+                )}
+              </Button>
             </div>
           </form>
         </Form>
       </div>
     </div>
   );
-};
+}

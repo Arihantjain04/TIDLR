@@ -149,10 +149,17 @@ const AdminPanel = () => {
                         <Button variant="outline" size="sm">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/edit-workshop-course/${course._id}`)}
+                          title="Edit Course">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => {
+                          if (window.confirm('Are you sure you want to delete this course?')) {
+                            // Add delete functionality here
+                            console.log('Deleting course:', course._id);
+                          }
+                        }}
+                          title="Delete Course">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
