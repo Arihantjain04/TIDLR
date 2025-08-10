@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { fetchCuratedCourses } from "@/lib/adminApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,10 +10,17 @@ import Navigation from "@/components/Navigation";
 
 
 const Workshop = () => {
+  const [showAllFeatured, setShowAllFeatured] = useState(false);
   const { data: curatedCourses, isLoading } = useQuery({
     queryKey: ["curatedCourses"],
     queryFn: fetchCuratedCourses,
   });
+  const [showAllCourses, setShowAllCourses] = useState(false);
+  const initialCount = 3; ///initially visible
+
+  const displayedCourses = showAllCourses
+    ? curatedCourses
+    : curatedCourses?.slice(0, initialCount);
 
   if (isLoading) {
     return (
@@ -35,7 +43,7 @@ const Workshop = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -48,11 +56,22 @@ const Workshop = () => {
         {/* Featured Courses */}
         {curatedCourses?.some(course => course.isFeatured) && (
           <div className="mb-12">
-            <h2 className="text-2xl font-bold text-foreground mb-6">Featured</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-foreground">Featured</h2>
+              {curatedCourses.filter(course => course.isFeatured).length > 3 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAllFeatured(prev => !prev)}
+                >
+                  {showAllFeatured ? "Show Less" : "See All"}
+                </Button>
+              )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {curatedCourses
                 .filter(course => course.isFeatured)
-                .slice(0, 2)
+                .slice(0, showAllFeatured ? undefined : 3) //only limits if not expanded
                 .map((course) => (
                   <Card key={course._id} className="hover:shadow-lg transition-shadow">
                     <CardHeader>
@@ -74,7 +93,7 @@ const Workshop = () => {
                       <p className="text-muted-foreground mb-4 line-clamp-2">
                         {course.description}
                       </p>
-                      
+
                       <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
                         <div className="flex items-center gap-1">
                           <Clock className="h-4 w-4" />
@@ -107,10 +126,22 @@ const Workshop = () => {
 
         {/* All Courses */}
         <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-foreground">All Courses</h2>
-          
+          {/* title + show button */}
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-foreground">All Courses</h2>
+            {curatedCourses?.length > initialCount && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAllCourses((prev) => !prev)}
+              >
+                {showAllCourses ? "Show Less" : "See All"}
+              </Button>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {curatedCourses?.map((course) => (
+            {displayedCourses?.map((course) => (
               <Card key={course._id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">
@@ -130,7 +161,7 @@ const Workshop = () => {
                   <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
                     {course.description}
                   </p>
-                  
+
                   <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
