@@ -57,3 +57,16 @@ export const fetchCourseResources = async (courseId: string): Promise<Resource[]
     estimated_minutes: res.estimated_minutes,
   }));
 };
+
+export const deleteCourse = async (courseId: string) => {
+  const response = await fetch(`/v1/workshop/workshop-courses/${courseId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!response.ok) {
+    throw new Error('Network response was not ok');
+  }
+  return response.json();
+};

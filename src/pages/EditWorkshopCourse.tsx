@@ -791,15 +791,21 @@ export default function EditWorkshopCourse() {
                           <FormControl>
                             <div className="relative">
                               <Input
-                                type="number"
-                                min="1"
-                                placeholder="60"
-                                {...field}
-                                onChange={(e) =>
-                                  field.onChange(
-                                    parseInt(e.target.value) || undefined
-                                  )
-                                }
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                placeholder="0"
+                                value={field.value ?? ""}
+                                onChange={(e) => {
+                                  const onlyNumbers = e.target.value.replace(/\D/g, ""); // remove non-digits
+                                  const noLeadingZeros = onlyNumbers.replace(/^0+(?=\d)/, "");
+                                  field.onChange(noLeadingZeros);
+                                }}
+                                onBlur={(e) => {
+                                  // Convert to number only when the user finishes editing
+                                  const val = e.target.value.replace(/^0+(?=\d)/, "");
+                                  field.onChange(val === "" ? undefined : parseInt(val, 10));
+                                }}
                               />
                               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                                 mins
@@ -927,9 +933,14 @@ export default function EditWorkshopCourse() {
                     placeholder="Paste YouTube link, playlist, article URL, etc."
                     value={newResourceUrl}
                     onChange={(e) => setNewResourceUrl(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addResource()}
+                    onKeyDown={(e) =>{ if(e.key === "Enter"){ 
+                      e.preventDefault();  
+                      addResource();
+                    }
+                    }
+                  }
                   />
-                  <Button onClick={addResource} disabled={playlistLoading}>
+                  <Button type="button" onClick={addResource} disabled={playlistLoading}>
                     {playlistLoading ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />

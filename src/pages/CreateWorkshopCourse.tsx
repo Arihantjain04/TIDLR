@@ -244,6 +244,7 @@ console.log("Current tags:", tags);
         </span>
         <Button
           size="sm"
+          type="button"
           variant="ghost"
           onClick={() => removeResource(resource.id)}
         >
@@ -505,15 +506,16 @@ console.log("Current tags:", tags);
                           <FormControl>
                             <div className="relative">
                               <Input
-                                type="number"
-                                min="1"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 placeholder="60"
-                                {...field}
-                                onChange={(e) =>
-                                  field.onChange(
-                                    parseInt(e.target.value) || undefined
-                                  )
-                                }
+                                value={field.value ?? ""}
+                                onChange={(e) => {
+                                  const onlyNumbers = e.target.value.replace(/\D/g, ""); // remove non-digits
+                                  const noLeadingZeros = onlyNumbers.replace(/^0+(?=\d)/, "");
+                                  field.onChange(noLeadingZeros === "" ? undefined : parseInt(noLeadingZeros));
+                                }}
                               />
                               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                                 mins
@@ -645,9 +647,14 @@ console.log("Current tags:", tags);
                     placeholder="Paste YouTube link, playlist, article URL, etc."
                     value={newResourceUrl}
                     onChange={(e) => setNewResourceUrl(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addResource()}
+                    onKeyDown={(e) => {
+                      if(e.key === "Enter") {
+                        e.preventDefault();
+                        addResource();
+                      }
+                    }}
                   />
-                  <Button onClick={addResource} disabled={playlistLoading}>
+                  <Button type="button" onClick={addResource} disabled={playlistLoading}>
                     {playlistLoading ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -1,17 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
-import { fetchUsers, fetchCuratedCourses, fetchAdminAnalytics, fetchUserCourses } from "@/lib/adminApi";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchUsers, fetchCuratedCourses, fetchAdminAnalytics, fetchUserCourses, deleteCourse } from "@/lib/adminApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Users, 
-  BookOpen, 
-  TrendingUp, 
-  Plus, 
-  Edit, 
-  Trash2, 
+import {
+  Users,
+  BookOpen,
+  TrendingUp,
+  Plus,
+  Edit,
+  Trash2,
   Eye,
   Clock,
   Star,
@@ -21,7 +21,7 @@ import Navigation from "@/components/Navigation";
 
 const AdminPanel = () => {
   const isAdmin = true;
-
+  const queryClient = useQueryClient();
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
     queryKey: ["analytics"],
     queryFn: fetchAdminAnalytics
@@ -40,6 +40,35 @@ const AdminPanel = () => {
     queryKey: ["userCourses"],
     queryFn: fetchUserCourses,
   });
+  const { mutate: removeCourse, isPending: deletingCourse } = useMutation({
+  mutationFn: (courseId: string) => deleteCourse(courseId),
+  onMutate: async (courseId: string) => {
+    // Cancel ongoing queries
+    await queryClient.cancelQueries({ queryKey:["curatedCourses"] });
+
+    // Snapshot current data
+    const prevData = queryClient.getQueryData(["curatedCourses"]);
+
+    // Optimistically update cache
+    queryClient.setQueryData(["curatedCourses"], (old : any) =>
+      old ? old.filter((course : any) => course._id !== courseId) : []
+    );
+
+    return { prevData };
+  },
+  onError: (err, courseId, context) => {
+    // Roll back if error
+    if (context?.prevData) {
+      queryClient.setQueryData(["curatedCourses"], context.prevData);
+    }
+    console.error(err);
+    alert("Failed to delete course");
+  },
+  onSettled: () => {
+    // Refetch to sync with backend
+    queryClient.invalidateQueries({queryKey :["curatedCourses"] });
+  },
+});
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-background">
@@ -68,7 +97,7 @@ const AdminPanel = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
@@ -153,9 +182,10 @@ const AdminPanel = () => {
                           title="Edit Course">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => {
+                        <Button type="button" variant="outline" size="sm"
+                        disabled={deletingCourse} onClick={() => {
                           if (window.confirm('Are you sure you want to delete this course?')) {
-                            // Add delete functionality here
+                            removeCourse(course._id);
                             console.log('Deleting course:', course._id);
                           }
                         }}
