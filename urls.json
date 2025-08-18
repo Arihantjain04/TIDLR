@@ -1,4 +1,4 @@
 {
-    "serverurl": "https://tidlr-backend.onrender.com",
-    "serverurl1": "http://localhost:8000"
+    "serverurl1": "https://tidlr-backend.onrender.com",
+    "serverurl": "http://localhost:8000"
 }
