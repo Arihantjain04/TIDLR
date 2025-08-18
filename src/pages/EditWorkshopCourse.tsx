@@ -12,6 +12,7 @@ import {
   X,
   GripVertical,
   Loader2,
+  Youtube,
   FileText,
   Link as LinkIcon,
   Save,
@@ -47,7 +48,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { arrayMove } from "@dnd-kit/sortable";
-import { Youtube } from "lucide-react";
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -136,14 +136,11 @@ export default function EditWorkshopCourse() {
 
   // Set resources when they're loaded
   useEffect(() => {
-    if (courseResources && courseResources.length > 0) {
-      const formattedResources = courseResources.filter(resource => resource.url && resource.url.trim() !== "").map((resource, index) => ({
-        id: resource.id || index + 1,
+    if (courseResources) {
+      const formattedResources = courseResources.map((resource) => ({
+        ...resource,
+        id: resource.id,
         type: resource.type_of_resource === "video" ? "youtube" : resource.type_of_resource || "article",
-        title: resource.title || "Untitled Resource",
-        url: resource.url,
-        description: resource.description || "",
-        estimated_minutes: resource.estimated_minutes || 0,
       }));
       setResources(formattedResources);
     }
@@ -216,8 +213,15 @@ export default function EditWorkshopCourse() {
     if (data.cover && data.cover instanceof File) {
       formDataToSend.append("cover", data.cover);
     }
+    else if (coverPreview) {
+      // No new file, but an existing image preview is visible
+      formDataToSend.append("cover", coverPreview);
+    }
     if (data.curatorAvatar && data.curatorAvatar instanceof File) {
       formDataToSend.append("curatorAvatar", data.curatorAvatar);
+    }
+    else if (avatarPreview) {
+      formDataToSend.append("curatorAvatar", avatarPreview);
     }
 
 
@@ -528,7 +532,13 @@ export default function EditWorkshopCourse() {
 
   const addResource = async () => {
     if (!newResourceUrl.trim()) return;
-
+    const getResourceType = (url) => {
+      if (url.includes("youtube.com") || url.includes("youtu.be")) {
+        return "youtube";
+      }
+      // You can add more checks here for other types, e.g., vimeo, etc.
+      return "article"; // Default to article
+    };
     const isPlaylist = newResourceUrl.includes("list=");
 
     if (isPlaylist) {
@@ -569,7 +579,7 @@ export default function EditWorkshopCourse() {
     } else {
       const newResource = {
         id: Date.now(),
-        type: newResourceUrl.includes("youtube") ? "youtube" : "video",
+        type:  getResourceType(newResourceUrl),
         title: "New Resource",
         url: newResourceUrl,
         description: "Click edit to update description",

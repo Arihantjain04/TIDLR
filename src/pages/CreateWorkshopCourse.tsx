@@ -113,7 +113,7 @@ console.log("Current tags:", tags);
     // Tags as JSON string or multiple .append("tags", tag)
     formDataToSend.append("resources", JSON.stringify(resources));
     formDataToSend.append("tags", JSON.stringify(data.tags || []));
-    formDataToSend.append("numberOfResc", data.numberOfResc?.toString() || "0");
+    formDataToSend.append("numberOfResc", resources.length.toString());
 
 
     //debugging
@@ -542,7 +542,6 @@ console.log("Current tags:", tags);
                         onKeyDown={handleAddTag}
                       />
                     </div>
-                    <input type="hidden" {...form.register("tags")} />
                     <div className="flex flex-wrap gap-2">
                       {form.watch("tags")?.map((tag, index) => (
                         <Badge
